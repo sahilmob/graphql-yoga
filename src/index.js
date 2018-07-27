@@ -1,56 +1,40 @@
 const {GraphQLServer} = require('graphql-yoga')
+const { Prisma } = require('prisma-binding')
 
-let links = [{
-    id: 'link-0',
-    url: 'www.howtographql.com',
-    description: 'Fullstack tutorial for GraphQL'
-  }]
-
-let idCount = links.length
 
 const resolvers = {
-    Query : {
-        info: () => `This is the API of a Hackernews Clone`,
-        feed: () => links,
-        link: (root, args) => { 
-            const link = links.find((el)=>el.id === args.id)
-            return link
-        }
+    Query: {
+      info: () => `This is the API of a Hackernews Clone`,
+      feed: (root, args, context, info) => {
+        return context.db.query.links({}, info)
+      },
     },
-        Link: {
-            id: (root) => root.id,
-            description: (root) => root.description,
-            url: (root) => root.url,
-        },
-        Mutation: {
-            post: (root, args)=>{
-                const link = {
-                    id: `link-${idCount++}`,
-                    description: args.description,
-                    url: args.url
-                }
-                links.push(link);
-                return link;
-            },
-            updateLink: (root, args) =>{
-                const link = links.find((el)=>el.id === args.id)
-                link.description = args.description
-                link.url = args.url
-                return link
-            },
-            deleteLink: (root, args) =>{
-                const link = links.find((el)=>el.id === args.id)
-                links.splice(links.indexOf(link,1))
-                return link
-            }
-        }
-    }
+    Mutation: {
+      post: (root, args, context, info) => {
+        return context.db.mutation.createLink({
+          data: {
+            url: args.url,
+            description: args.description,
+          },
+        }, info)
+      },
+    },
+  }
 
 
 
 const server = new GraphQLServer({
     typeDefs: './src/schema.graphql',
-    resolvers
+    resolvers,
+    context: req => ({
+        ...req,
+        db: new Prisma({
+          typeDefs: 'src/generated/prisma.graphql',
+          endpoint: 'https://us1.prisma.sh/sahilhmob-4a3b45/database/dev',
+          secret: 'mysecret123',
+          debug: true,
+        }),
+      }),
 })
 
 server.start(()=>{
